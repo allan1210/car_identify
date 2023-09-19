@@ -8,7 +8,7 @@ from pymongo import MongoClient
 from datetime import datetime
 from bson import ObjectId
 
-# 与MongoDB建立连接
+# 與MongoDB建立連接
 client = MongoClient('mongodb://localhost:27017/')
 db = client['車牌辨識資料庫']
 collection = db['車牌']
@@ -19,14 +19,22 @@ if not cap.isOpened():
     print("無法打開攝像頭")
     exit()
 
-# 图像处理函数
+# 圖像處裡函數
 def preprocess_image(image):
     if image is None:
         return None
     resized_image = imutils.resize(image, width=500)
-    gray = cv2.cvtColor(resized_image, cv2.COLOR_BGR2GRAY)
-    gray = cv2.bilateralFilter(gray, 11, 50, 50)
-    edged = cv2.Canny(gray, 50, 150)
+    
+    # 去噪 - 使用中值滤波
+    blurred = cv2.medianBlur(resized_image, 5)
+    
+    gray = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
+    
+    # 增強對比
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(gray)
+    
+    edged = cv2.Canny(enhanced, 50, 150)
     return edged
 
 # 車牌識別函数
@@ -72,13 +80,13 @@ def recognize_license_plate(frame):
                 print("當前時間:", current_time)
                 license_plate_text = text
                 
-                # 框出车牌
+                # 框出車牌 
                 x, y, w, h = cv2.boundingRect(NumberPlateCnt)
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 
                 return license_plate_text
 
-# 将车牌保存进MongoDB
+# 將車牌保存進MongoDB
 def save_license_plate(plate_number):
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
@@ -92,14 +100,14 @@ def save_license_plate(plate_number):
     else:
         print("數據插入失败")
 
-# 跟踪已经插入的车牌号码
+# 跟踪已经插入的車牌號碼
 inserted_license_plates = set()
 
-# 创建一个窗口来显示摄像头画面
+# 創建一个窗口来显示摄像头画面
 cv2.namedWindow('Camera Feed', cv2.WINDOW_NORMAL)
 cv2.setWindowProperty('Camera Feed', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
 
-# 主循环
+# 主循環
 while True:
     ret, frame = cap.read()
 
@@ -111,23 +119,23 @@ while True:
     license_plate_text = recognize_license_plate(frame)
 
     if license_plate_text:
-        # 检查是否已经插入过这个车牌号码
+        # 檢查是否已经插入過這個車牌號碼
         if license_plate_text not in inserted_license_plates:
             inserted_license_plates.add(license_plate_text)
             # 输出结果
             print("車牌號碼:", license_plate_text)
             save_license_plate(license_plate_text)
 
-    # 显示摄像头画面
+    # 顯示摄像頭畫面
     cv2.imshow('Camera Feed', frame)
     cv2.waitKey(1)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# 释放摄像头资源
+# 釋放摄像頭資源
 cv2.destroyAllWindows()
 cap.release()
 
-# 关闭MongoDB连接
+# 關閉MongoDB連接
 client.close()
