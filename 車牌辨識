@@ -13,7 +13,7 @@ client = MongoClient('mongodb://localhost:27017/')
 db = client['車牌辨識資料庫']
 collection = db['車牌']
 
-# 打开摄像头
+# 打開攝像機
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
     print("無法打開攝像頭")
