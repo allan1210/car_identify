@@ -103,7 +103,7 @@ def save_license_plate(plate_number):
 # 跟踪已经插入的車牌號碼
 inserted_license_plates = set()
 
-# 創建一个窗口来显示摄像头画面
+# 創建一个窗口来顯示畫面
 cv2.namedWindow('Camera Feed', cv2.WINDOW_NORMAL)
 cv2.setWindowProperty('Camera Feed', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
 
