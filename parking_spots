@@ -38,7 +38,6 @@ def is_within_parking_spot(x, y, parking_spot):
         return True
     return False
 
-# 计算剩余的停车位数量
 remaining_spots = len(parking_spot_ids) - len(parked_vehicles)
 
 while True:
@@ -64,7 +63,6 @@ while True:
         cv2.putText(frame, f"車牌: {vehicle_id}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         cv2.putText(frame, f"停放時間: {int(parked_time)} 秒", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         cv2.putText(frame, f"車位: {spot_id}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        # 在视频帧上显示剩余停车位数量
         cv2.putText(frame, f"剩餘停車位數: {remaining_spots}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
     parked_vehicles = {} 
