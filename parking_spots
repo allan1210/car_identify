@@ -16,8 +16,8 @@ parking_spots = {
 
 model_weights = 'yolov3.weights'
 model_cfg = 'yolov3.cfg'
-confidence_threshold = 0.1
-parking_spot_ids = ["A1", "A2", "A3"]
+confidence_threshold = 0.5
+parking_spot_ids = ["A1","A2","A3"]
 
 client = MongoClient('mongodb://localhost:27017/')
 db = client.parking_database
@@ -109,5 +109,4 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
-
 client.close()
