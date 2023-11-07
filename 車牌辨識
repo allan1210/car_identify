@@ -1,50 +1,39 @@
 import cv2
-import os
 import imutils
-import numpy as np
 import pytesseract
-import easyocr
+import numpy as np
+import re
 from pymongo import MongoClient
 from datetime import datetime
 from bson import ObjectId
 
-# 與MongoDB建立連接
 client = MongoClient('mongodb://localhost:27017/')
 db = client['車牌辨識資料庫']
 collection = db['車牌']
 
-# 打開攝像機
+# 初始化摄像头
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
-    print("無法打開攝像頭")
+    print("無法打开摄像头")
     exit()
 
-# 圖像處裡函數
 def preprocess_image(image):
     if image is None:
         return None
     resized_image = imutils.resize(image, width=500)
-    
-    # 去噪 - 使用中值滤波
     blurred = cv2.medianBlur(resized_image, 5)
-    
     gray = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
-    
-    # 增強對比
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
-    
     edged = cv2.Canny(enhanced, 50, 150)
     return edged
 
-# 車牌識別函数
 def recognize_license_plate(frame):
     edged = preprocess_image(frame)
     license_plate_text = None
     NumberPlateCnt = None
 
     contours, _ = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
 
     for contour in contours:
         if cv2.contourArea(contour) < 1000:
@@ -65,49 +54,42 @@ def recognize_license_plate(frame):
             cv2.imwrite('thresh1.jpg', thresh1)
 
             text = pytesseract.image_to_string(thresh1, lang='eng', config='--psm 11')
-            reader = easyocr.Reader(['en'], gpu=True)
-            result = reader.readtext(thresh1)
+            text = re.sub(r'[^A-Z0-9-]', '', text)
 
-            for detection in result:
-                if detection[1] == 'TW':
-                    text = detection[0]
-                    break
-
-            if text:
+            if len(text) == 8 and text[3] == '-':
                 print("車牌:", text)
                 now = datetime.now()
                 current_time = now.strftime("%H:%M:%S")
-                print("當前時間:", current_time)
-                license_plate_text = text
+                print("現在時間:", current_time)
+
+                if len(text) >= 7 and len(text) <= 8:
+                    save_license_plate(text)
                 
-                # 框出車牌 
                 x, y, w, h = cv2.boundingRect(NumberPlateCnt)
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 
-                return license_plate_text
+                return text
+    return None
 
-# 將車牌保存進MongoDB
 def save_license_plate(plate_number):
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
-    data = {'車牌': plate_number, '時間': current_time}
-    data['_id'] = ObjectId()
-
-    result = collection.insert_one(data)
-
-    if result.inserted_id:
-        print("數據插入成功")
+    existing_record = collection.find_one({'車牌': plate_number})
+    if existing_record:
+        print("数据已存在，不需要插入")
     else:
-        print("數據插入失败")
+        data = {'車牌': plate_number, '時間': current_time}
+        data['_id'] = ObjectId()
 
-# 跟踪已经插入的車牌號碼
+        result = collection.insert_one(data)
+
+        if result.inserted_id:
+            print("插入成功")
+        else:
+            print("插入失败")
+
 inserted_license_plates = set()
 
-# 創建一个窗口来顯示畫面
-cv2.namedWindow('Camera Feed', cv2.WINDOW_NORMAL)
-cv2.setWindowProperty('Camera Feed', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
-
-# 主循環
 while True:
     ret, frame = cap.read()
 
@@ -119,23 +101,18 @@ while True:
     license_plate_text = recognize_license_plate(frame)
 
     if license_plate_text:
-        # 檢查是否已经插入過這個車牌號碼
+
         if license_plate_text not in inserted_license_plates:
             inserted_license_plates.add(license_plate_text)
-            # 输出结果
-            print("車牌號碼:", license_plate_text)
+
             save_license_plate(license_plate_text)
 
-    # 顯示摄像頭畫面
-    cv2.imshow('Camera Feed', frame)
-    cv2.waitKey(1)
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    cv2.imshow('Camera Feed', frame)
+
+    if cv2.waitKey(3) & 0xFF == ord('q'):
         break
 
-# 釋放摄像頭資源
 cv2.destroyAllWindows()
 cap.release()
-
-# 關閉MongoDB連接
 client.close()
