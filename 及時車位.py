@@ -3,104 +3,98 @@ import numpy as np
 import easyocr
 from pymongo import MongoClient
 
-# Set EasyOCR language and model
-reader = easyocr.Reader(['en'], gpu=True)  # Enable GPU if available
+# 設定 EasyOCR 的語言和模型
+reader = easyocr.Reader(['en'], gpu=True)  # 如果有 GPU，啟用 GPU
 
-# Connect to MongoDB
+# 連接到 MongoDB
 client = MongoClient('mongodb://localhost:27017/')
 db = client['車位資料庫']
 collection = db['車位']
 
-# Initialize total parking spaces
-total_spaces = 3  # Assuming there are three parking spaces
+# 初始化總空位數
+total_spaces = 3  # 假設總共有三個停車位
 
 def process_parking_spaces(frame, parking_spaces):
-    global total_spaces  # Use global variable
+    global total_spaces  # 使用全局變數
 
     for space_name, space_info in parking_spaces.items():
-        # Create a mask to keep only the parking space region
+        # 創建掩膜，只保留停車位區域
         mask = np.zeros_like(frame)
         cv2.fillPoly(mask, [space_info["points"]], (255, 255, 255))
         result = cv2.bitwise_and(frame, mask)
 
-        # Convert the parking space region to grayscale
+        # 將停車位區域轉換為灰階
         roi_gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
-        # Apply histogram equalization for low-light conditions
-        roi_gray = cv2.equalizeHist(roi_gray)
-
-        # Gaussian blur for noise reduction
+        # 使用高斯模糊進行降噪qq
         roi_blurred = cv2.GaussianBlur(roi_gray, (5, 5), 0)
 
-        # Canny edge detection
+        # 使用 Canny 邊緣檢測
         roi_edged = cv2.Canny(roi_blurred, 30, 150)
 
-        # Adaptive thresholding for better binary image
-        roi_thresh = cv2.adaptiveThreshold(roi_blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 4)
-
-        # Find contours
-        roi_contours, _ = cv2.findContours(roi_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # 尋找輪廓
+        roi_contours, _ = cv2.findContours(roi_edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         min_area = 100
         max_area = 1000
         min_aspect_ratio = 1.5
         max_aspect_ratio = 3.0
 
-        # Initialize parking space status
-        status = "Vacant"  # Default status is vacant
+        # 初始化停車位狀態
+        status = "Vacant"  # 停車位預設為空閑
 
-        # Initialize text result
+        # 初始化文字結果
         text = ""
 
-        # License plate recognition
+        # 進行車牌辨識
         for roi_contour in roi_contours:
-            # Calculate contour area
+            # 計算輪廓面積
             area = cv2.contourArea(roi_contour)
 
-            # Calculate bounding rectangle
+            # 計算包圍矩形
             x, y, w, h = cv2.boundingRect(roi_contour)
 
-            # Calculate aspect ratio
+            # 計算寬高比
             aspect_ratio = float(w) / h
 
-            # Filter contours
+            # 篩選輪廓
             if min_area < area < max_area and min_aspect_ratio < aspect_ratio < max_aspect_ratio:
-                # Polygon approximation
+                # 進行多邊形逼近
                 epsilon = 0.02 * cv2.arcLength(roi_contour, True)
                 approx = cv2.approxPolyDP(roi_contour, epsilon, True)
 
-                # Use shape fitting to ensure it is a rectangle
+                # 使用形狀擬合確保是矩形
                 if len(approx) == 4:
-                    # Draw a rectangle around the license plate area
+                    # 繪製車牌區域的矩形
                     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)
 
-                    # Extract the license plate area
+                    # 提取車牌區域
                     plate_roi = frame[y:y + h, x:x + w]
 
-                    # Convert the license plate area to grayscale
+                    # 將車牌區域轉換為灰階
                     plate_gray = cv2.cvtColor(plate_roi, cv2.COLOR_BGR2GRAY)
 
-                    # Use EasyOCR for text recognition
+                    # 使用 EasyOCR 進行文字辨識
                     results = reader.readtext(plate_gray)
 
                     if results:
                         text = results[0][1]
-                        status = "Occupied"  # If a license plate is detected, the parking space is occupied
-                        total_spaces -= 1  # Decrease by one for each occupied space
-                        break  # Stop the loop after detecting one license plate
+                        status = "Occupied"  # 如果有偵測到車牌，表示停車位被占用
+                        total_spaces -= 1  # 每有一個車位被占用就減一
+                        break  # 停止迴圈，只取一個車牌
 
-        # Display parking space status and text result in the top left corner of the window
+        # 將停車位狀態和文字結果顯示在視窗左上角
         font = cv2.FONT_HERSHEY_SIMPLEX
 
-        # Check parking space status, set text color to red for "Occupied" and green for "Vacant"
+        # 檢查車位狀態，如果為 Occupied，將文字顏色設定為紅色，否則為綠色
         text_color = (0, 0, 255) if status == "Occupied" else (0, 255, 0)
 
         cv2.putText(frame, f"{space_name} Status: {status} Plate: {text}", (10, 30 * int(space_name[-1])), font, 0.5, text_color, 2)
 
-        # Output results to the console
+        # 在控制台輸出結果
         print(f"{space_name} Status: {status} Plate: {text}")
 
-        # Write data to MongoDB
+        # 將資料寫入 MongoDB
         data = {
             'space_name': space_name,
             'status': status,
@@ -108,32 +102,41 @@ def process_parking_spaces(frame, parking_spaces):
         }
         collection.insert_one(data)
 
-    # Display the remaining vacant spaces in the top right corner
+    # 在視窗右上角顯示剩餘空位數
     cv2.putText(frame, f"Vacant Spaces: {total_spaces}", (frame.shape[1] - 200, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
-    # Display real-time image
+    # 顯示即時影像
     cv2.imshow('Real-time Parking - Image', frame)
 
-    # Output remaining vacant spaces to the console
+    # 在控制台輸出剩餘空位數
     print(f"Vacant Spaces: {total_spaces}")
 
-# Use a higher resolution camera (e.g., change '0' to the appropriate camera index)
-cap = cv2.VideoCapture(0)  # 0 means using the default camera
 
-# 停車位資訊
-A1_left_top = (43, 305)
-A1_left_bottom = (0, 386)
-A1_right_top = (321, 307)
-A1_right_bottom = (241, 386)
+# 使用攝影機捕獲即時影像
+cap = cv2.VideoCapture(0)  # 0 表示默認攝影機，可以更改為其他數字，例如1，依據實際情況
+# 調整相機曝光度
+cap.set(cv2.CAP_PROP_EXPOSURE, 0.5)
 
-A2_left_top = (321, 307)
-A2_left_bottom = (241, 386)
-A2_right_top = (494, 297)
-A2_right_bottom = (571, 391)
+def enhance_low_light_image(image):
+    # 使用CLAHE進行對比度增強
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced_image = clahe.apply(image)
+    return enhanced_image
 
-A3_left_top = (494, 297)
-A3_left_bottom = (571, 391)
-A3_right_top = (751, 291)
-A3_right_bottom = (798, 382)
+
+A1_left_top = (68, 287)
+A1_left_bottom = (2, 385)
+A1_right_top = (319, 311)
+A1_right_bottom = (238, 389)
+
+A2_left_top = (320, 301)
+A2_left_bottom = (241, 387)
+A2_right_top = (495, 304)
+A2_right_bottom = (569, 389)
+
+A3_left_top = (510, 311)
+A3_left_bottom = (571, 383)
+A3_right_top = (729, 284)
+A3_right_bottom = (798, 386)
 
 # 停車位資訊
 parking_spaces = {
@@ -143,23 +146,23 @@ parking_spaces = {
 }
 
 while True:
-    # Read a frame
+    # 讀取當前幀
     ret, frame = cap.read()
+
+    # 如果讀取失敗，則退出迴圈
     if not ret:
-        print("Unable to read camera video stream.")
         break
 
-    # Process parking spaces
+    # 在這裡添加您的車位檢測和顯示邏輯
     process_parking_spaces(frame, parking_spaces)
 
-    # Wait for a key event to exit the loop
-    key = cv2.waitKey(1)
-    if key == ord('q') or key == 27:
+    # 如果按下 'q' 鍵，則退出迴圈
+    if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# Release resources
+# 釋放資源
 cap.release()
 cv2.destroyAllWindows()
 
-# Close MongoDB connection
+# 關閉 MongoDB 連接
 client.close()
