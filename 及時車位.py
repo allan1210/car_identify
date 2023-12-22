@@ -113,15 +113,6 @@ def process_parking_spaces(frame, parking_spaces):
 
 # 使用攝影機捕獲即時影像
 cap = cv2.VideoCapture(0)  # 0 表示默認攝影機，可以更改為其他數字，例如1，依據實際情況
-# 調整相機曝光度
-cap.set(cv2.CAP_PROP_EXPOSURE, 0.5)
-
-def enhance_low_light_image(image):
-    # 使用CLAHE進行對比度增強
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    enhanced_image = clahe.apply(image)
-    return enhanced_image
-
 
 A1_left_top = (68, 287)
 A1_left_bottom = (2, 385)
