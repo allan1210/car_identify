@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import easyocr
 from pymongo import MongoClient
+import time
 
 # 設定 EasyOCR 的語言和模型
 reader = easyocr.Reader(['en'], gpu=True)  # 如果有 GPU，啟用 GPU
@@ -26,7 +27,7 @@ def process_parking_spaces(frame, parking_spaces):
         # 將停車位區域轉換為灰階
         roi_gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
-        # 使用高斯模糊進行降噪qq
+        # 使用高斯模糊進行降噪
         roi_blurred = cv2.GaussianBlur(roi_gray, (5, 5), 0)
 
         # 使用 Canny 邊緣檢測
@@ -110,7 +111,6 @@ def process_parking_spaces(frame, parking_spaces):
     # 在控制台輸出剩餘空位數
     print(f"Vacant Spaces: {total_spaces}")
 
-
 # 使用攝影機捕獲即時影像
 cap = cv2.VideoCapture(0)  # 0 表示默認攝影機，可以更改為其他數字，例如1，依據實際情況
 
@@ -136,6 +136,7 @@ parking_spaces = {
     "A3": {"points": np.array([A3_left_top, A3_left_bottom, A3_right_bottom, A3_right_top], dtype=np.int32)},
 }
 
+# 主迴圈處理即時影像
 while True:
     # 讀取當前幀
     ret, frame = cap.read()
@@ -147,9 +148,16 @@ while True:
     # 在這裡添加您的車位檢測和顯示邏輯
     process_parking_spaces(frame, parking_spaces)
 
+    # 等待 30 秒
+    for _ in range(10):
+        key = cv2.waitKey(1000) & 0xFF
+        if key == ord('q'):
+            break
+
     # 如果按下 'q' 鍵，則退出迴圈
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    if key == ord('q'):
         break
+
 
 # 釋放資源
 cap.release()
