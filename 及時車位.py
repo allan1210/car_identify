@@ -4,6 +4,7 @@ import easyocr
 from pymongo import MongoClient
 import time
 
+
 # 設定 EasyOCR 的語言和模型
 reader = easyocr.Reader(['en'], gpu=True)  # 如果有 GPU，啟用 GPU
 
@@ -12,11 +13,13 @@ client = MongoClient('mongodb://localhost:27017/')
 db = client['車位資料庫']
 collection = db['車位']
 
-# 初始化總空位數
+# 初始化總空位數和已佔用的車位數
 total_spaces = 3  # 假設總共有三個停車位
+detected_spaces = 0
 
 def process_parking_spaces(frame, parking_spaces):
-    global total_spaces  # 使用全局變數
+    global detected_spaces
+    detected_spaces = 0  # 將偵測到的車位數重設為零
 
     for space_name, space_info in parking_spaces.items():
         # 創建掩膜，只保留停車位區域
@@ -81,7 +84,6 @@ def process_parking_spaces(frame, parking_spaces):
                     if results:
                         text = results[0][1]
                         status = "Occupied"  # 如果有偵測到車牌，表示停車位被占用
-                        total_spaces -= 1  # 每有一個車位被占用就減一
                         break  # 停止迴圈，只取一個車牌
 
         # 將停車位狀態和文字結果顯示在視窗左上角
@@ -103,31 +105,36 @@ def process_parking_spaces(frame, parking_spaces):
         }
         collection.insert_one(data)
 
+        # 更新已偵測到的車位數
+        if status == "Occupied":
+            detected_spaces += 1
+
+    # 計算剩餘空位數
+    vacant_spaces = max(0, total_spaces - detected_spaces)
+
     # 在視窗右上角顯示剩餘空位數
-    cv2.putText(frame, f"Vacant Spaces: {total_spaces}", (frame.shape[1] - 200, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+    cv2.putText(frame, f"Vacant Spaces: {vacant_spaces}", (frame.shape[1] - 200, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
     # 顯示即時影像
     cv2.imshow('Real-time Parking - Image', frame)
 
-    # 在控制台輸出剩餘空位數
-    print(f"Vacant Spaces: {total_spaces}")
-
 # 使用攝影機捕獲即時影像
-cap = cv2.VideoCapture(0)  # 0 表示默認攝影機，可以更改為其他數字，例如1，依據實際情況
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # 0 表示默認攝影機
 
-A1_left_top = (68, 287)
-A1_left_bottom = (2, 385)
-A1_right_top = (319, 311)
-A1_right_bottom = (238, 389)
+# 停車位資訊
+A1_left_top = (36, 296)
+A1_left_bottom = (6, 377)
+A1_right_top = (252, 305)
+A1_right_bottom = (192, 373)
 
-A2_left_top = (320, 301)
-A2_left_bottom = (241, 387)
-A2_right_top = (495, 304)
-A2_right_bottom = (569, 389)
+A2_left_top = (252, 305)
+A2_left_bottom = (192, 373)
+A2_right_top = (413, 309)
+A2_right_bottom = (468, 377)
 
-A3_left_top = (510, 311)
-A3_left_bottom = (571, 383)
-A3_right_top = (729, 284)
-A3_right_bottom = (798, 386)
+A3_left_top = (413, 309)
+A3_left_bottom = (468, 377)
+A3_right_top = (569, 308)
+A3_right_bottom = (637, 369)
 
 # 停車位資訊
 parking_spaces = {
@@ -148,16 +155,13 @@ while True:
     # 在這裡添加您的車位檢測和顯示邏輯
     process_parking_spaces(frame, parking_spaces)
 
-    # 等待 30 秒
-    for _ in range(10):
-        key = cv2.waitKey(1000) & 0xFF
-        if key == ord('q'):
-            break
+    # 顯示即時影像
+    cv2.imshow('Real-time Parking - Image', frame)
 
     # 如果按下 'q' 鍵，則退出迴圈
+    key = cv2.waitKey(1)
     if key == ord('q'):
         break
-
 
 # 釋放資源
 cap.release()
