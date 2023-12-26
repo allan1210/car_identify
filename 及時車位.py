@@ -3,10 +3,10 @@ import numpy as np
 import easyocr
 from pymongo import MongoClient
 import time
-
+import re
 
 # 設定 EasyOCR 的語言和模型
-reader = easyocr.Reader(['en'], gpu=True)  # 如果有 GPU，啟用 GPU
+reader = easyocr.Reader(['en'], gpu=True)
 
 # 連接到 MongoDB
 client = MongoClient('mongodb://localhost:27017/')
@@ -20,6 +20,7 @@ detected_spaces = 0
 def process_parking_spaces(frame, parking_spaces):
     global detected_spaces
     detected_spaces = 0  # 將偵測到的車位數重設為零
+    vacant_spaces = total_spaces 
 
     for space_name, space_info in parking_spaces.items():
         # 創建掩膜，只保留停車位區域
@@ -77,12 +78,16 @@ def process_parking_spaces(frame, parking_spaces):
 
                     # 將車牌區域轉換為灰階
                     plate_gray = cv2.cvtColor(plate_roi, cv2.COLOR_BGR2GRAY)
+                    
 
                     # 使用 EasyOCR 進行文字辨識
                     results = reader.readtext(plate_gray)
+                    
 
                     if results:
-                        text = results[0][1]
+                        text = results[0][1]                        
+                        clean_text = re.sub(r'[^a-zA-Z0-9]', '', text)
+
                         status = "Occupied"  # 如果有偵測到車牌，表示停車位被占用
                         break  # 停止迴圈，只取一個車牌
 
@@ -96,7 +101,6 @@ def process_parking_spaces(frame, parking_spaces):
 
         # 在控制台輸出結果
         print(f"{space_name} Status: {status} Plate: {text}")
-
         # 將資料寫入 MongoDB
         data = {
             'space_name': space_name,
@@ -111,6 +115,7 @@ def process_parking_spaces(frame, parking_spaces):
 
     # 計算剩餘空位數
     vacant_spaces = max(0, total_spaces - detected_spaces)
+    print(f"Vacant Spaces: {vacant_spaces}")
 
     # 在視窗右上角顯示剩餘空位數
     cv2.putText(frame, f"Vacant Spaces: {vacant_spaces}", (frame.shape[1] - 200, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
@@ -155,11 +160,13 @@ while True:
     # 在這裡添加您的車位檢測和顯示邏輯
     process_parking_spaces(frame, parking_spaces)
 
-    # 顯示即時影像
-    cv2.imshow('Real-time Parking - Image', frame)
+    # 等待 30 秒
+    for _ in range(10):
+        key = cv2.waitKey(1000) & 0xFF
+        if key == ord('q'):
+            break
 
     # 如果按下 'q' 鍵，則退出迴圈
-    key = cv2.waitKey(1)
     if key == ord('q'):
         break
 
