@@ -2,15 +2,21 @@ import cv2
 import numpy as np
 import easyocr
 from pymongo import MongoClient
-import time
+from datetime import datetime
+import re
 
 # 設定 EasyOCR 的語言和模型
-reader = easyocr.Reader(['en'], gpu=True)  # 如果有 GPU，啟用 GPU
+reader = easyocr.Reader(['en'], gpu=True)
 
-# 連接到 MongoDB
-client = MongoClient('mongodb://localhost:27017/')
-db = client['車位資料庫']
-collection = db['車位']
+# 連接到 MongoDB (第一个数据库)
+client_parking = MongoClient('mongodb://localhost:27017/')
+db_parking = client_parking['parking_system']
+collection_parking = db_parking['parking_space']
+
+# 連接到第二个 MongoDB 数据库
+client_vacant = MongoClient('mongodb://localhost:27017/')
+db_vacant = client_vacant['parking_system']
+collection_vacant = db_vacant['Vacant Spaces']
 
 # 初始化總空位數和已佔用的車位數
 total_spaces = 3  # 假設總共有三個停車位
@@ -77,12 +83,16 @@ def process_parking_spaces(frame, parking_spaces):
 
                     # 將車牌區域轉換為灰階
                     plate_gray = cv2.cvtColor(plate_roi, cv2.COLOR_BGR2GRAY)
+                    
 
                     # 使用 EasyOCR 進行文字辨識
                     results = reader.readtext(plate_gray)
+                    
 
                     if results:
-                        text = results[0][1]
+                        text = results[0][1]                        
+                        clean_text = re.sub(r'[^a-zA-Z0-9]', '', text)
+
                         status = "Occupied"  # 如果有偵測到車牌，表示停車位被占用
                         break  # 停止迴圈，只取一個車牌
 
@@ -96,21 +106,30 @@ def process_parking_spaces(frame, parking_spaces):
 
         # 在控制台輸出結果
         print(f"{space_name} Status: {status} Plate: {text}")
-        # 將資料寫入 MongoDB
-        data = {
+
+        # 将数据写入 MongoDB (parking_space 集合)
+        data_parking = {
             'space_name': space_name,
             'status': status,
             'plate': text
         }
-        collection.insert_one(data)
+        collection_parking.insert_one(data_parking)
 
-        # 更新已偵測到的車位數
+
+       # 更新已偵測到的車位數
         if status == "Occupied":
             detected_spaces += 1
 
     # 計算剩餘空位數
     vacant_spaces = max(0, total_spaces - detected_spaces)
     print(f"Vacant Spaces: {vacant_spaces}")
+
+    # 將 Vacant Spaces 信息写入到第二个 MongoDB 数据库 (vacant_space_info 集合)
+    data_vacant = {
+        'timestamp': datetime.now().strftime("%H:%M:%S"),
+        'vacant_spaces': vacant_spaces
+    }
+    collection_vacant.insert_one(data_vacant)
 
     # 在視窗右上角顯示剩餘空位數
     cv2.putText(frame, f"Vacant Spaces: {vacant_spaces}", (frame.shape[1] - 200, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
@@ -169,5 +188,10 @@ while True:
 cap.release()
 cv2.destroyAllWindows()
 
+# 釋放資源
+cap.release()
+cv2.destroyAllWindows()
+
 # 關閉 MongoDB 連接
-client.close()
+client_parking.close()
+client_vacant.close()
