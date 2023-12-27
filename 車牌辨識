@@ -83,31 +83,24 @@ def recognize_license_plate(frame):
 def save_license_plate(plate_number):
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
-    existing_record = collection.find_one({'license plate': plate_number})
-    if existing_record:
-        print("數據已存在，不需要插入")
-    else:
-        data = {'license plate': plate_number, 'Entry time': current_time}
-        data['_id'] = ObjectId()
 
-        result = collection.insert_one(data)
+    # 构建要发送的 API 数据
+    api_data = {'license_plate': plate_number, 'entry_time': current_time}
 
-        if result.inserted_id:
-            print("插入成功")
+    # 打印即将发送的数据和目标 API 地址
+    print("即将发送的数据:", api_data)
+    print("目标 API 地址:", api_server_url)
 
-            # 發送車牌資訊到 API 伺服器
-            api_data = {'license_plate': plate_number, 'entry_time': current_time}
-            try:
-                response = requests.post(api_server_url, json=api_data)
-                if response.status_code == 200:
-                    print("車牌資訊成功發送到 API 伺服器")
-                else:
-                    print(f"API 伺服器回應錯誤: {response.status_code}")
-            except Exception as e:
-                print(f"發送請求時發生錯誤: {e}")
-
+    # 发送車牌資訊到 API 伺服器
+    try:
+        response = requests.post(api_server_url, json=api_data)
+        if response.status_code == 200:
+            print("車牌資訊成功發送到 API 伺服器")
         else:
-            print("插入失敗")
+            print(f"API 伺服器回應錯誤: {response.status_code}")
+            print(response.text)  # 打印详细的错误信息
+    except Exception as e:
+        print(f"發送請求時發生錯誤: {e}")
 
 # 避免重複插入相同的車牌號碼
 inserted_license_plates = set()
