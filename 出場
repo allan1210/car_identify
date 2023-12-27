@@ -11,7 +11,7 @@ client = MongoClient('mongodb://localhost:27017/')
 db = client['parking_system']  # 修改為你的資料庫名稱
 collection = db['parking_info']  # 修改為你的集合名稱
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 if not cap.isOpened():
     print("無法打开摄像头")
     exit()
