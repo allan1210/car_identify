@@ -10,8 +10,8 @@ reader = easyocr.Reader(['en'], gpu=True)
 
 # 連接到 MongoDB
 client = MongoClient('mongodb://localhost:27017/')
-db = client['車位資料庫']
-collection = db['車位']
+db = client['parking_system']
+collection = db['parking_space']
 
 # 初始化總空位數和已佔用的車位數
 total_spaces = 3  # 假設總共有三個停車位
