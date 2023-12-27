@@ -8,8 +8,8 @@ from datetime import datetime
 from bson import ObjectId
 
 client = MongoClient('mongodb://localhost:27017/')
-db = client['車牌辨識資料庫']
-collection = db['車牌']
+db = client['parking_system']  # 修改為你的資料庫名稱
+collection = db['parking_info']  # 修改為你的集合名稱
 
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
@@ -56,10 +56,10 @@ def recognize_license_plate(frame):
             text = re.sub(r'[^A-Z0-9-]', '', text)
 
             if len(text) == 8 and text[3] == '-':
-                print("車牌:", text)
+                print("plate_number:", text)
                 now = datetime.now()
                 current_time = now.strftime("%H:%M:%S")
-                print("現在時間:", current_time)
+                print("parking_start_time:", current_time)
 
                 if len(text) >= 7 and len(text) <= 8:
   
@@ -72,7 +72,7 @@ def recognize_license_plate(frame):
     return None
 
 def delete_license_plate(plate_number):
-    result = collection.delete_one({'車牌': plate_number})
+    result = collection.delete_one({'plate_number': plate_number})
     if result.deleted_count > 0:
         print("已刪除車牌號", plate_number, "紀錄")
     else:
