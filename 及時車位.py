@@ -79,11 +79,9 @@ def process_parking_spaces(frame, parking_spaces):
                     # 將車牌區域轉換為灰階
                     plate_gray = cv2.cvtColor(plate_roi, cv2.COLOR_BGR2GRAY)
                     
-
                     # 使用 EasyOCR 進行文字辨識
                     results = reader.readtext(plate_gray)
                     
-
                     if results:
                         text = results[0][1]                        
                         clean_text = re.sub(r'[^a-zA-Z0-9]', '', text)
@@ -126,26 +124,26 @@ def process_parking_spaces(frame, parking_spaces):
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # 0 表示默認攝影機
 
 # 停車位資訊
-A1_left_top = (36, 296)
-A1_left_bottom = (6, 377)
-A1_right_top = (252, 305)
-A1_right_bottom = (192, 373)
+A1_left_top = (8, 248)
+A1_left_bottom = (3, 356)
+A1_right_top = (259, 269)
+A1_right_bottom = (186, 358)
 
-A2_left_top = (252, 305)
-A2_left_bottom = (192, 373)
-A2_right_top = (413, 309)
-A2_right_bottom = (468, 377)
+A2_left_top = (259, 269)
+A2_left_bottom = (186, 358)
+A2_right_top = (416, 278)
+A2_right_bottom = (474, 365)
 
-A3_left_top = (413, 309)
-A3_left_bottom = (468, 377)
-A3_right_top = (569, 308)
-A3_right_bottom = (637, 369)
+A3_left_top =(416, 278)
+A3_left_bottom =(474, 365)
+A3_right_top = (571, 297)
+A3_right_bottom = (639, 362)
 
 # 停車位資訊
 parking_spaces = {
-    "A1": {"points": np.array([A1_left_top, A1_left_bottom, A1_right_bottom, A1_right_top], dtype=np.int32)},
-    "A2": {"points": np.array([A2_left_top, A2_left_bottom, A2_right_bottom, A2_right_top], dtype=np.int32)},
-    "A3": {"points": np.array([A3_left_top, A3_left_bottom, A3_right_bottom, A3_right_top], dtype=np.int32)},
+    "01": {"points": np.array([A1_left_top, A1_left_bottom, A1_right_bottom, A1_right_top], dtype=np.int32)},
+    "02": {"points": np.array([A2_left_top, A2_left_bottom, A2_right_bottom, A2_right_top], dtype=np.int32)},
+    "03": {"points": np.array([A3_left_top, A3_left_bottom, A3_right_bottom, A3_right_top], dtype=np.int32)},
 }
 
 # 主迴圈處理即時影像
